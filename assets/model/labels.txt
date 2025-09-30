@@ -1,0 +1,8 @@
+List<String> classLabels = [
+  "Business", 
+  "Casual", 
+  "Night Party",
+  "Sports",
+  "Wedding", 
+  "Other"
+];

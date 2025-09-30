@@ -1,0 +1,27 @@
+# TensorFlow Lite core
+-keep class org.tensorflow.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+
+# TFLite GPU delegate classes
+-keep class org.tensorflow.lite.gpu.** { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegateFactory$Options { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegateFactory$Options$GpuBackend { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegate { *; }
+
+# JNI methods
+-keepclassmembers class * {
+    native <methods>;
+}
+
+# Keep Android resource fields
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
+
+# Prevent warnings during shrink
+-dontwarn org.tensorflow.**
+-dontwarn org.tensorflow.lite.**
+
+# Optional: Prevent obfuscation of these classes (if you rely on reflection)
+-keepnames class org.tensorflow.** { *; }
+-keepnames class org.tensorflow.lite.** { *; }
