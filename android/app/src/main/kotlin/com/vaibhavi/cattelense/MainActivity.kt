@@ -1,4 +1,4 @@
-package com.example.style
+package com.vaibhavi.cattelense
 
 import io.flutter.embedding.android.FlutterActivity
 

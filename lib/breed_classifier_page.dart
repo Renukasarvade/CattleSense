@@ -5,25 +5,34 @@ import 'package:image_picker/image_picker.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 
-class OutfitClassifierPage extends StatefulWidget {
-  const OutfitClassifierPage({super.key});
+class BreedClassifierPage extends StatefulWidget {
+  const BreedClassifierPage({super.key});
 
   @override
-  State<OutfitClassifierPage> createState() => _OutfitClassifierPageState();
+  State<BreedClassifierPage> createState() => _BreedClassifierPageState();
 }
 
-class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
+class _BreedClassifierPageState extends State<BreedClassifierPage> {
   Interpreter? interpreter;
   File? selectedImage;
-  String result = "📷 Pick an image to run model";
+  String result = "📷 Pick an image to classify cattle breed";
 
   final List<String> classLabels = [
-    "Business",
-    "Other",
-    "Casual",
-    "Night Party",
-    "Sports",
-    "Wedding"
+    "Brown Swiss",
+    "Deoni",
+    "Gir",
+    "Hallikar",
+    "Holstein Friesian",
+    "Jaffrabadi",
+    "Kangayam",
+    "Kankrej",
+    "Khillari",
+    "Murrah",
+    "Nagpuri",
+    "Ongole",
+    "Sahiwal",
+    "Tharparkar",
+    "Toda"
   ];
 
   @override
@@ -34,10 +43,10 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
 
   Future<void> loadModel() async {
     try {
-      interpreter = await Interpreter.fromAsset('assets/model/model.tflite');
-      print("✅ Model loaded");
+      interpreter = await Interpreter.fromAsset('model/cattle_breed_classifier.tflite');
+      print("✅ Cattle Breed Model Loaded Successfully");
     } catch (e) {
-      print("❌ Failed to load model: $e");
+      print("❌ Model Loading Error: $e");
     }
   }
 
@@ -48,7 +57,7 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
     if (picked != null) {
       setState(() {
         selectedImage = File(picked.path);
-        result = "🧠 Running model...";
+        result = "🧠 Classifying...";
       });
       await runInference(File(picked.path));
     }
@@ -57,8 +66,9 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
   Future<void> runInference(File imageFile) async {
     final bytes = await imageFile.readAsBytes();
     img.Image? oriImage = img.decodeImage(bytes);
+
     if (oriImage == null) {
-      setState(() => result = "❌ Couldn't decode image");
+      setState(() => result = "❌ Failed to process image");
       return;
     }
 
@@ -66,62 +76,42 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
 
     var input = List.generate(
       1,
-          (_) => List.generate(
-        224,
-            (y) => List.generate(
-          224,
-              (x) {
-            final pixel = resized.getPixel(x, y);
-            return [
-              pixel.r / 255.0,
-              pixel.g / 255.0,
-              pixel.b / 255.0
-            ];
-          },
-        ),
-      ),
+          (_) => List.generate(224, (y) => List.generate(224, (x) {
+        final pixel = resized.getPixel(x, y);
+        return [
+          pixel.r / 255.0,
+          pixel.g / 255.0,
+          pixel.b / 255.0
+        ];
+      })),
     );
 
-    var output = List.filled(6, 0.0).reshape([1, 6]);
+    var output = List.generate(1, (_) => List.filled(15, 0.0));
 
     try {
       interpreter?.run(input, output);
-      print("Raw output: $output");
+      print("Raw Output: $output");
 
-      var outputWithSoftmax = softmax(output[0]);
-
-      int predictedIndex = outputWithSoftmax.indexOf(
-        outputWithSoftmax.reduce((a, b) => a > b ? a : b),
-      );
-
-      String predictedLabel = classLabels[predictedIndex];
-
-      // 📝 Define contextual messages
-      Map<String, String> contextMessages = {
-        "Wedding": "Wedding, Engagement, Festivals",
-        "Casual": "Cafe, Outing, Hangouts",
-        "Night Party": "Club, Reception, Celebrations",
-        "Sports": "Gym, Outdoor Activities, Running",
-        "Business": "Office, Meetings, Conferences",
-        "Other": "General, Unclassified, Mixed"
-      };
+      List<double> outputSoftmax = softmax(output[0]);
+      int maxIndex = outputSoftmax.indexOf(outputSoftmax.reduce(max));
 
       setState(() {
-        result = "✅ Prediction: $predictedLabel\n"
-            "📌 Suitable for: ${contextMessages[predictedLabel] ?? 'Various Occasions'}";
+        result = "✅ Breed Identified:\n📌 ${classLabels[maxIndex]}\n"
+            "🔢 Confidence: ${(outputSoftmax[maxIndex] * 100).toStringAsFixed(2)}%";
       });
     } catch (e) {
       setState(() {
-        result = "❌ Inference failed: $e";
+        result = "❌ Inference Failed: $e";
       });
     }
   }
 
   List<double> softmax(List<double> logits) {
     double maxLogit = logits.reduce(max);
-    List<double> expLogits = logits.map((logit) => exp(logit - maxLogit)).toList();
-    double sumExp = expLogits.reduce((a, b) => a + b);
-    return expLogits.map((e) => e / sumExp).toList();
+    List<double> expLogits =
+    logits.map((value) => exp(value - maxLogit)).toList();
+    double sum = expLogits.reduce((a, b) => a + b);
+    return expLogits.map((value) => value / sum).toList();
   }
 
   @override
@@ -129,7 +119,6 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔹 Background image
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -139,60 +128,58 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
             ),
           ),
 
-          // 🔹 Overlay content
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SingleChildScrollView(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
-                      'Outfit Classifier',
+                      'Cattle Breed Classifier',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 25),
+
                     if (selectedImage != null)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Image.file(
-                          selectedImage!,
-                          height: 250,
-                        ),
+                        child: Image.file(selectedImage!, height: 240),
                       ),
+
                     const SizedBox(height: 30),
+
                     ElevatedButton(
                       onPressed: pickImage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pinkAccent,
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                        backgroundColor: Colors.brown,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 25, vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        "Pick Image & Run Model",
-                        style: TextStyle(fontSize: 16),
-                      ),
+                      child: const Text("Pick Image & Classify",
+                          style: TextStyle(fontSize: 16)),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 25),
+
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                       child: Text(
                         result,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 18,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
                         ),
                       ),
                     ),
@@ -206,4 +193,3 @@ class _OutfitClassifierPageState extends State<OutfitClassifierPage> {
     );
   }
 }
-
